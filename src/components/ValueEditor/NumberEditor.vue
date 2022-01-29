@@ -6,8 +6,10 @@
     <template v-else> 
       <el-input-number v-if="this.list.length ==0"
         :value="editValue" 
+        @change="onValueChange"
       ></el-input-number>
-      <el-select v-else v-model="editValue">
+      <el-select v-else v-model="editValue" 
+        @change="onValueChange">
         <el-option
           v-for="(item,index) in this.list"
           :key="index"
@@ -54,10 +56,11 @@ export default class NumberEditor extends EditorProps {
     }
   }
 
-  @Watch('editValue', { immediate: true, deep: true })
-  onPersonChanged1(val: number, oldVal: number) {
-    this.$emit("change",this.refPropertyId, val,oldVal)
+  onValueChange(val : string){
+    this.$emit('input', val)
+    this.$emit('change', this.refPropertyId, val)
   }
+    
     
 }
 </script>

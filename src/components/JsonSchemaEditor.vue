@@ -4,7 +4,7 @@
       <el-col :span="16">
         <el-table
           :data="editorItems"
-          row-key="uid"
+          row-key="key"
           border
           default-expand-all
           :tree-props="{ children: 'children', hasChildren: 'hasChildren' }"
@@ -12,9 +12,9 @@
           @current-change="handleCurrentChange"
           @row-click="handleRowClick"
         >
-          <el-table-column
-            prop="name"
-            label="属性名"
+          <!-- <el-table-column
+            prop="key"
+            label="Key"
             fixed
             sortable
             width="180"
@@ -22,10 +22,26 @@
             <template slot-scope="scope">
               <el-input
                 v-if="scope.row.isEdit && scope.row.canRename"
-                v-model="scope.row.name"
+                v-model="scope.row.key"
                 placeholder=""
                 size="mini"
                 style="width: 80px"
+              ></el-input>
+              <span v-else>{{ scope.row.key }}</span>
+            </template>
+          </el-table-column> -->
+          <el-table-column
+            prop="name"
+            label="名称"
+            fixed
+            sortable 
+          >
+            <template slot-scope="scope">
+              <el-input
+                v-if="scope.row.isEdit && scope.row.canRename"
+                v-model="scope.row.name"
+                placeholder=""
+                size="mini"  
               ></el-input>
               <span v-else>{{ scope.row.name }}</span>
             </template>
@@ -65,15 +81,25 @@
 
           <el-table-column fixed="right" label="操作">
             <template slot-scope="scope">
-              <el-button
+
+              <el-dropdown 
                 :disabled="
                   scope.row.schemaType != 'Array' &&
                   scope.row.schemaType != 'Object'
-                "
-                size="mini"
-                @click="handleAddChild(scope.$index, scope.row)"
-                ><i class="el-icon-plus"></i
-              ></el-button>
+                " 
+                >
+                <el-button type="primary" size="mini"  >
+                  <i class="el-icon-plus"></i><i class="el-icon-arrow-down el-icon--right"></i>
+                </el-button>
+                
+                <el-dropdown-menu slot="dropdown" >  
+                  <el-dropdown-item><a @click="handleAddChild(scope.$index, scope.row)">String Type</a></el-dropdown-item>
+                  <el-dropdown-item>狮子头</el-dropdown-item>
+                  <el-dropdown-item>螺蛳粉</el-dropdown-item>
+                  <el-dropdown-item>双皮奶</el-dropdown-item>
+                  <el-dropdown-item>蚵仔煎</el-dropdown-item>
+                </el-dropdown-menu>
+              </el-dropdown> 
               <el-button
                 size="mini"
                 type="danger"
@@ -88,25 +114,22 @@
         <el-table :data="curObj"  >
           <el-table-column label="属性" sortable prop="name"></el-table-column>
           <el-table-column label="值" 
-            :filters="[{ text: 'undefined', value: 'undefined' },{ text: 'defined', value: 'defined' }  ]"
+            :filters="[{ text: '未定义', value: 'undefined' },{ text: '已定义值', value: 'defined' }  ]"
             :filter-method="filterPropertyValue"
             filter-placement="bottom-end"
           >
-            <template slot-scope="scope"> 
-              <component  v-bind:is="scope.row.propType + 'Editor'"
-                v-model="scope.row.value"
-                :refPropertyId="scope.row.name" 
-                :readonly="scope.row.readonly"
-                v-on:change="onPropertyChange"
-                :list="scope.row.list"
-              > 
-              </component>  
+            <template slot-scope="scope">  
+                <component  v-bind:is="scope.row.propType + 'Editor'" 
+                  v-model="scope.row.value"
+                  :refPropertyId="scope.row.name" 
+                  :readonly="scope.row.readonly"
+                  v-on:change="onPropertyChange"
+                  :list="scope.row.list"
+                > 
+                </component>
             </template>
           </el-table-column>
-        </el-table>
-        <StringEditor name="d1" value="sdfd" :list="['1','2','4,']" refPropertyId="sd" ></StringEditor>
-        <StringEditor name="d12" value="sdfd" refPropertyId="sd" ></StringEditor>
-        <StringEditor name="d122" value="sdfd" :readonly="true" refPropertyId="sd" ></StringEditor>
+        </el-table> 
       </el-col>
     </el-row>
     <div>
@@ -158,7 +181,6 @@ export default class JsonSchemaEditor extends Vue {
   editorItems: Array<JsonSchemaBaseSchema> = [this.schemaDoc];
 
   curObj = this.schemaDoc.getProperties();
-  curJsonChema :JsonSchemaBaseSchema = this.schemaDoc
   edtingRow: JsonSchemaBaseSchema|null = null; 
 
   tableData = [
@@ -215,37 +237,33 @@ export default class JsonSchemaEditor extends Vue {
       return !!row.value 
   }
 
-  onPropertyChange(key:string, val:string, oldval:string):void{
-    console.log(val,this.curObj,this.curJsonChema[key]); 
-
+  onPropertyChange(key:string, val:string):void{
+    console.log("onPropertyChange","key",key,"val",val,"curObj",this.curObj,"edtingRow:",this.edtingRow );  
+    if (this.edtingRow)
+      this.edtingRow[key] = val
   }
-
-  handleEdit(index: number, row: JsonSchemaBaseSchema) {
-    console.log(index, row);
-  }
+ 
   handleAddChild(index: number, row: JsonSchemaBaseSchema) {
     row.NewSubSchema();
-    console.log("add schema", index, row);
+    console.log("handleAddChild schema", index, row);
   }
   handleDelete(index: number, row: JsonSchemaBaseSchema) {
-    console.log(index, row);
+    console.log("handleDelete",index, row);
   }
 
   handleCurrentChange(row: JsonSchemaBaseSchema) {
-    console.log("handleCurrentChange,", row);
 
     this.curObj = row.getProperties();
-    this.curJsonChema = row
+    this.edtingRow = row
+    //row.isEdit = true;
+    console.log("handleCurrentChange,", row,"this.curObj",this.curObj);
   }
 
   handleRowClick(row: JsonSchemaBaseSchema, column :any, event:any) {
-    row.isEdit = true;
 
     console.log("handleRowClick", column);
 
-    this.cancelEdit();
-    this.edtingRow = row;
-    console.log("handleRowClick");
+   // this.cancelEdit(); 
   }
   cancelEdit() {
     console.log("cancelEdit");
@@ -284,7 +302,7 @@ export default class JsonSchemaEditor extends Vue {
     });
   }
   test() {
-    console.log(this.curObj);
+    console.log(this.schemaDoc);
     
   }
   save() {

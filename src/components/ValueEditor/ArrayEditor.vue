@@ -41,6 +41,11 @@ export default class ArrayEditor extends EditorProps {
       
     }
   }
+  onValueChange(val : string){
+    this.$emit('input', val)
+    this.$emit('change', this.refPropertyId, val)
+  }
+    
     
 }
 </script>

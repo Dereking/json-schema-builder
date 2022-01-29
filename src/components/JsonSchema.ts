@@ -2,20 +2,74 @@
 
 //import { prototype } from "vue/types/umd"
 
-export enum JsonSchemaDataType   { Null="Null", Object="Object", Array="Array", String="String", Number="Number", Boolean ="Boolean" }
+export enum JsonSchemaDataType { Null = "Null", Object = "Object", Array = "Array", String = "String", Number = "Number", Boolean = "Boolean" }
 
-export type TJsonSchemaValueAnyType = JsonSchemaBaseSchema |boolean|string| number|Array<unknown>|Record<string, unknown>| null |undefined
+export type TJsonSchemaValueAnyType = JsonSchemaBaseSchema | boolean | string | number | Array<unknown> | Record<string, unknown> | null | undefined
+ 
+const keywords=[
+    "$schema","$id","$vocabulary", "$anchor" ,
 
-let uniqid= 1
+    "type","name",
+
+    "$comment",
+    "$ref","$refs","$dynamicRef",
+
+    "$defs" ,
+
+    //Keywords for Applying Subschemas to Objects
+    "properties",
+    "patternProperties",   
+    "additionalProperties",//"additionalProperties", whose behavior is defined in terms of "properties" and "patternProperties"
+    "propertyNames",//If the instance is an object, this keyword validates if every property name in the instance validates against the provided schema.
+                    // Note the property name that the schema is testing will always be a string.
+    
+    "default",
+    "maxLength",
+    "exclusiveMinimum" ,
+    "allOf" , //This keyword's value MUST be a non-empty array. Each item of the array MUST be a valid JSON Schema.
+    "anyOf",//This keyword's value MUST be a non-empty array. Each item of the array MUST be a valid JSON Schema.
+    "oneOf",//This keyword's value MUST be a non-empty array. Each item of the array MUST be a valid JSON Schema.
+    "not",// This keyword's value MUST be a valid JSON Schema.
+
+    //"if", "then", and "else" MUST NOT interact with each other across subschema boundaries.
+    // In other words, an "if" in one branch of an "allOf" MUST NOT have an impact on a "then" or "else" in another branch.
+    "if",//This keyword's value MUST be a valid JSON Schema.
+    "then", 
+    "else",
+
+    //Keywords for Applying Subschemas to Child Instances
+
+    //This keyword applies its subschema to all instance elements at indexes greater
+    // than the length of the "prefixItems" array in the same schema object,
+    // as reported by the annotation result of that "prefixItems" keyword. 
+    //If no such annotation result exists, "items" applies its subschema to all instance array elements. [CREF11]
+    "items", // whose behavior is defined in terms of "prefixItems" 
+    
+    "prefixItems", //The value of "prefixItems" MUST be a non-empty array of valid JSON Schemas.
+    "contains", //whose behavior is defined in terms of "minContains"
+
+    "minContains",
+
+
+    //A Vocabulary for Unevaluated Locations
+    "unevaluatedItems", //whose behavior is defined in terms of annotations from "prefixItems", "items", "contains", and itself
+    "unevaluatedProperties", //whose behavior is defined in terms of annotations from "properties", "patternProperties",
+                            // "additionalProperties" and itself
+
+] 
+
+
+//id seed for object key.
+let uniqid = 1
 
 //原始 JsonSchema 类型
-export class JsonSchema{ 
-    $schema :string|null|undefined = undefined
-    $id  :string|null|undefined = undefined
-    $vocabulary :Array<string>
+export class JsonSchema {
+    $schema: string | null | undefined = undefined
+    $id: string | null | undefined = undefined
+    $vocabulary: Array<string>
 
-    constructor(obj : any){
-        this.$vocabulary  = []
+    constructor(obj: any) {
+        this.$vocabulary = []
 
         Object.assign(this, obj)
         Object.assign(this.$vocabulary, obj["$vocabulary"])
@@ -24,155 +78,216 @@ export class JsonSchema{
 
 
 
-//interface LooseObject extends Record<string, unknown>{}
+//for inject key-value to object.
 interface LooseObject {
-    // key: string
-    // val?:unknown 
     [key: string]: unknown
 }
 
 //result of toJson() function 
-export class JsonSchemaRes implements LooseObject{
-    [key: string]: unknown 
+export class JsonSchemaRes implements LooseObject {
+    [key: string]: unknown
 }
 
-export class JsonSchemaPropertyDef{
-    name :string 
-    propType:JsonSchemaDataType
-    list: Array<string>
-    value : TJsonSchemaValueAnyType 
+//json schema property defination.
+export class JsonSchemaPropertyDef {
+    name: string
+    propType: JsonSchemaDataType
+    list: Array<string> //a list for value can be.
+    value: TJsonSchemaValueAnyType
     readonly = false
-    constructor(name : string,propType: JsonSchemaDataType, list: Array<string>, value :TJsonSchemaValueAnyType,readonly:boolean ){
-        this.name= name
+    constructor(name: string, propType: JsonSchemaDataType, list: Array<string>, value: TJsonSchemaValueAnyType, readonly: boolean) {
+        this.name = name
         this.value = value
         this.list = list
         this.propType = propType
-        this.readonly= readonly
+        this.readonly = readonly
     }
 }
 
 //base schema class .
+//there are 2 kinds of properties in a JsonSchemaBaseSchema object:
+// 1. key-value , include indected properties. name\key\'properties'\$scehma 
+// 2. children object, for example, properties in 'properties' scehma.
+// the key-value properties are edited in object inspector panel.
+// the children properties  are edited in main object inspector panel .
 export class JsonSchemaBaseSchema implements LooseObject {
-    uid = "uid"+(uniqid++) 
-    isEdit =false
+    //injected key-value properties
+    //for key-value injection
+    [key: string]: unknown
 
-    name  = "" //name of the schema 
-    title :string |undefined = undefined
-    description :string |undefined = undefined
-    schemaType : JsonSchemaDataType = JsonSchemaDataType.Null
-    value :TJsonSchemaValueAnyType
-    default : TJsonSchemaValueAnyType
+    // parent : JsonSchemaBaseSchema |null = null
 
-    $schema :string |undefined = undefined
-    $id :string |undefined = undefined
+    //children properties
+    //children store the ([key: string]: unknown) key and value. for el-table display.
+    children: Array<JsonSchemaBaseSchema> = []
 
-    $anchor :string |undefined = undefined
-    $dynamicAnchor :string |undefined = undefined 
 
-    
-   // hasChildren = false
-    children: Array<JsonSchemaBaseSchema>   = []
+    //meta key-value properties
+
+    //key of the schema in parent object. {"key":{}}
+    key: string
+    //name of the schema 
+    name: string | undefined = undefined
+    title: string | undefined = undefined
+
+    //description :string |undefined = undefined
+    description: string | undefined = undefined
+    schemaType: JsonSchemaDataType = JsonSchemaDataType.Null
+    value: TJsonSchemaValueAnyType
+    default: TJsonSchemaValueAnyType
+
+    $schema: string | undefined = undefined
+    $id: string | undefined = undefined
+
+    $anchor: string | undefined = undefined
+    $dynamicAnchor: string | undefined = undefined
+
+
+
+    //辅助属性。 
+    parentType: JsonSchemaDataType | null = null
+    parentName: string | null | undefined = null
+    isEdit = false
     canRename = false
 
 
-    constructor(name :string, jtype : JsonSchemaDataType, val :TJsonSchemaValueAnyType,canRename :boolean,title?:string) { 
-        this.value = val
+    constructor(parent: JsonSchemaBaseSchema | null, key: string, name: string, jtype: JsonSchemaDataType, val: TJsonSchemaValueAnyType, canRename: boolean, title?: string) {
+
+        let newkey = !key ? "key" + (uniqid++) : key
+        if (parent != null && parent.hasChildByKey(newkey)) {
+            newkey = key + "_" + (uniqid++)
+        }
+        this.key = newkey
+
+        // this.parent = parent
+        this.parentType = parent ? parent.schemaType : null
+        this.parentName = parent ? parent.name : null
+        console.log("constructor parentName", this.parentName, this.parentType);
+
         this.name = name
         this.title = title
         this.schemaType = jtype
+        this.value = val
         this.canRename = canRename
-    }
-    [key: string]: unknown
-    public getProperties():Array<JsonSchemaPropertyDef>{
-        const ret=[]
-        //Null="Null", Object=, Array=, String=}
-        ret.push(new JsonSchemaPropertyDef("type", JsonSchemaDataType.String, ["Null","Object","String","Array", "Number", "Boolean" ], this.schemaType,false))
-        ret.push(new JsonSchemaPropertyDef("$schema",JsonSchemaDataType.String,[], this.$schema,false))
-        ret.push(new JsonSchemaPropertyDef("$id",JsonSchemaDataType.String,[], this.$id,false))
-        ret.push(new JsonSchemaPropertyDef("name",JsonSchemaDataType.String,[], this.name,true))
-        ret.push(new JsonSchemaPropertyDef("title",JsonSchemaDataType.String,[],this.title,false))
-        ret.push(new JsonSchemaPropertyDef("description",JsonSchemaDataType.String,[],this.description,false))
-       //ret.push(new JsonSchemaPropertyDef("children",this.children,false))
-        //ret.push(new JsonSchemaPropertyDef("$vocabulary",JsonSchemaDataType.Array,[],this.$vocabulary,false))
-        ret.push(new JsonSchemaPropertyDef("$anchor",JsonSchemaDataType.String,[],this.$anchor,false))
-        ret.push(new JsonSchemaPropertyDef("$dynamicAnchor",JsonSchemaDataType.String,[],this.$dynamicAnchor,false))
-        ret.push(new JsonSchemaPropertyDef("value",JsonSchemaDataType.Object,[], this.value,false))
-        ret.push(new JsonSchemaPropertyDef("default",JsonSchemaDataType.Object,[], this.default,false))
-       
-        console.log(ret);
+
+        console.log("constructor  ", this.name);
         
+        if (this.name =="ROOT"){
+             this.AddSubSchema("properties", new JsonSchemaProperties(this))
+        }
+    }
+
+    private hasChildByKey(key: string): boolean {
+        for (let index = 0; index < this.children.length; index++) {
+            const child = this.children[index];
+            if (child.key == key)
+                return true
+        }
+        return false
+    }
+
+
+    public getProperties(): Array<JsonSchemaPropertyDef> {
+        const ret = []
+        //Null="Null", Object=, Array=, String=}
+        ret.push(new JsonSchemaPropertyDef("schemaType", JsonSchemaDataType.String, ["Null", "Object", "String", "Array", "Number", "Boolean"], this.schemaType, false))
+
+        const readonly = !!(this.parentName && this.parentName != 'properties')
+        ret.push(new JsonSchemaPropertyDef("key", JsonSchemaDataType.String, [], this.key, readonly))
+
+        ret.push(new JsonSchemaPropertyDef("name", JsonSchemaDataType.String, [], this.name, false))
+
+        ret.push(new JsonSchemaPropertyDef("title", JsonSchemaDataType.String, [], this.title, false))
+        ret.push(new JsonSchemaPropertyDef("description", JsonSchemaDataType.String, [], this.description, false))
+        ret.push(new JsonSchemaPropertyDef("$schema", JsonSchemaDataType.String, [], this.$schema, false))
+        ret.push(new JsonSchemaPropertyDef("$id", JsonSchemaDataType.String, [], this.$id, false))
+
+        ret.push(new JsonSchemaPropertyDef("value", JsonSchemaDataType.Object, [], this.value, false))
+        ret.push(new JsonSchemaPropertyDef("default", JsonSchemaDataType.Object, [], this.default, false))
+        //ret.push(new JsonSchemaPropertyDef("children",this.children,false))
+        //ret.push(new JsonSchemaPropertyDef("$vocabulary",JsonSchemaDataType.Array,[],this.$vocabulary,false))
+        ret.push(new JsonSchemaPropertyDef("$anchor", JsonSchemaDataType.String, [], this.$anchor, false))
+        ret.push(new JsonSchemaPropertyDef("$dynamicAnchor", JsonSchemaDataType.String, [], this.$dynamicAnchor, false))
+
+        console.log("getProperties ===", ret);
+
         return ret
     }
 
-    toJson():JsonSchemaRes {
+    // setValue(key:string, val: string){
+
+    // }
+
+
+    toJson(): JsonSchemaRes {
         const ret = new JsonSchemaRes()
         this.children.forEach(c => {
-            (<LooseObject> ret) [c.name] =c.toJson()
+            if (c.name) {
+                (<LooseObject>ret)[c.name] = c.toJson()
+            }
         });
 
-        if(this.canRename){
-            (<LooseObject> ret)['name'] = this.name
+        if (this.canRename) {
+            (<LooseObject>ret)['name'] = this.name
         }
-        (<LooseObject> ret)['type'] =  this.schemaType .toLocaleLowerCase()
+        (<LooseObject>ret)['type'] = this.schemaType.toLocaleLowerCase()
 
-        if (this.title != undefined ) (<LooseObject> ret) ['title'] = this.title   
-        if (this.description != undefined )(<LooseObject> ret) ['description'] = this.description 
-        if (this.$schema != undefined )(<LooseObject> ret) ['$schema'] = this.$schema 
-        if (this.$id != undefined )(<LooseObject> ret) ['$id'] = this.$id 
-        if (this.$anchor != undefined )(<LooseObject> ret) ['$anchor'] = this.$anchor 
-        if (this.$dynamicAnchor != undefined ) 
-          (<LooseObject> ret)['$dynamicAnchor'] = this.$dynamicAnchor 
-        return ret 
+        if (this.title != undefined) (<LooseObject>ret)['title'] = this.title
+        if (this.description != undefined) (<LooseObject>ret)['description'] = this.description
+        if (this.$schema != undefined) (<LooseObject>ret)['$schema'] = this.$schema
+        if (this.$id != undefined) (<LooseObject>ret)['$id'] = this.$id
+        if (this.$anchor != undefined) (<LooseObject>ret)['$anchor'] = this.$anchor
+        if (this.$dynamicAnchor != undefined)
+            (<LooseObject>ret)['$dynamicAnchor'] = this.$dynamicAnchor 
+
+
+        return ret
     }
 
-    public NewSubSchema(){ 
-            this.children .push( new JsonSchemaDefault()) 
-    } 
-    
-    public AddSubSchema(name:string, schema: JsonSchemaBaseSchema){
-        console.log("add", name,schema);
+    public NewSubSchema() {
+        this.children.push(new JsonSchemaString(this, ""))
+    }
+
+    public AddSubSchema(name: string, schema: JsonSchemaBaseSchema) {
         this.children.push(schema)
-        //this.hasChildren = true 
     }
 }
 
 
 
 //创建jsonschema的document 类
-export class JsonSchemaDocument   extends JsonSchemaBaseSchema {
-    MediaType= "application/schema+json";
+export class JsonSchemaDocument extends JsonSchemaBaseSchema {
+    MediaType = "application/schema+json";
     url = ""
 
-    //$schema: JsonSchema$schema 
-    //$id: JsonSchema$id 
-    // $vocabulary: Array<string> =[]
-    // properties: JsonSchemaProperties
+    // properties : JsonSchemaProperties = new JsonSchemaProperties(this)
+    // $vocabulary : JsonSchema$vocabulary = new JsonSchema$vocabulary(this,[])
+    // $defs : JsonSchema$defs = new JsonSchema$defs(this)
 
     //jsonschema 文档对象反序列化后。
-    jsonschemaObj: JsonSchema 
+    jsonschemaObj: JsonSchema
 
     constructor() {
-        super("ROOT",JsonSchemaDataType.Object,undefined,true) 
+        super(null, "ROOT", "ROOT", JsonSchemaDataType.Object, undefined, true)
 
         this.jsonschemaObj = new JsonSchema({})
-      // this.$schema = new JsonSchema$schema($schema)
+        // this.$schema = new JsonSchema$schema($schema)
         //this.$id = new JsonSchema$id($schema)
         // this.$vocabulary = new JsonSchema$vocabulary([])
 
         // this.properties = new JsonSchemaProperties()
 
 
-        this.AddSubSchema("$vocabulary",new JsonSchema$vocabulary([])) 
-        this.AddSubSchema("properties",new JsonSchemaProperties()) 
-        this.AddSubSchema("$defs",new JsonSchema$defs()) 
+        this.AddSubSchema("$vocabulary", new JsonSchema$vocabulary(this, []))
+        this.AddSubSchema("$defs", new JsonSchema$defs(this))
     }
 
     public test(): string {
         return "dd"
     }
 
-    public LoadFromUrl(jsonUrl :string, clb:()=>void):void {
- 
+    public LoadFromUrl(jsonUrl: string, clb: () => void): void {
+
         this.url = jsonUrl
 
         const that = this
@@ -181,15 +296,15 @@ export class JsonSchemaDocument   extends JsonSchemaBaseSchema {
 
             this.jsonschemaObj = JSON.parse(json);
             console.log(this.jsonschemaObj);
-            
 
-           // this.$schema = new JsonSchema$schema(this.jsonschemaObj.$schema)
-           // this.$id = new JsonSchema$id(this.jsonschemaObj.$id)
-          //  this.$vocabulary = new JsonSchema$vocabulary([])
+
+            // this.$schema = new JsonSchema$schema(this.jsonschemaObj.$schema)
+            // this.$id = new JsonSchema$id(this.jsonschemaObj.$id)
+            //  this.$vocabulary = new JsonSchema$vocabulary([])
             clb()
         }, (err) => {
-            console.log("err", err) 
-        }) 
+            console.log("err", err)
+        })
     }
 
     private load(url: string, clb: (json: string) => void, onError: (err: string) => void): void {
@@ -208,21 +323,63 @@ export class JsonSchemaDocument   extends JsonSchemaBaseSchema {
             onError("status=" + xhr.status + ", response=" + xhr.responseText)
         }
     }
- 
-}
 
-//DefaultSchema
-export class JsonSchemaDefault extends JsonSchemaBaseSchema {
-    constructor() {
-        super("key"+ (uniqid++), JsonSchemaDataType.String,"",true);
+
+    toJson(): JsonSchemaRes {
+        const ret = new JsonSchemaRes()
+        this.children.forEach(c => {
+            if (c.key) {
+                (<LooseObject>ret)[c.key] = c.toJson()
+            }
+        });
+
+        if (this.canRename) {
+            (<LooseObject>ret)['name'] = this.name
+        }
+        (<LooseObject>ret)['type'] = this.schemaType.toLocaleLowerCase()
+
+        if (this.title != undefined) (<LooseObject>ret)['title'] = this.title
+        if (this.description != undefined) (<LooseObject>ret)['description'] = this.description
+        if (this.$schema != undefined) (<LooseObject>ret)['$schema'] = this.$schema
+        if (this.$id != undefined) (<LooseObject>ret)['$id'] = this.$id
+        if (this.$anchor != undefined) (<LooseObject>ret)['$anchor'] = this.$anchor
+        if (this.$dynamicAnchor != undefined) {
+            (<LooseObject>ret)['$dynamicAnchor'] = this.$dynamicAnchor
+        }
+
+        // (<LooseObject> ret)['$vocabulary']  = this.$vocabulary;
+        // (<LooseObject> ret)['properties']  = this.properties;
+        // (<LooseObject> ret)['$defs']  = this.$defs
+        return ret
     }
 }
 
+
+
+//JsonSchemaString
+export class JsonSchemaString extends JsonSchemaBaseSchema {
+    constructor(parent: JsonSchemaBaseSchema, str: string) {
+        super(parent, "", "string1", JsonSchemaDataType.String, str, true);
+    }
+
+    toString(): string {
+        return !this.value ? "" : this.value.toString()
+    }
+}
+
+//JsonSchemaObject
+export class JsonSchemaObject extends JsonSchemaBaseSchema {
+    constructor(parent: JsonSchemaBaseSchema, name: string) {
+        super(parent, "", "object1", JsonSchemaDataType.String, {}, true);
+    }
+}
+
+
 //VocabularySubSchema
 export class JsonSchemaVocabularySubSchema extends JsonSchemaBaseSchema {
-    constructor() {
-        super("https://json-schema.org/draft/2020-12/vocab/core", JsonSchemaDataType.Boolean,
-            true,true);
+    constructor(parent: JsonSchemaBaseSchema) {
+        super(parent, "", "https://json-schema.org/draft/2020-12/vocab/core", JsonSchemaDataType.Boolean,
+            true, true);
     }
 }
 
@@ -231,10 +388,10 @@ export class JsonSchemaVocabularySubSchema extends JsonSchemaBaseSchema {
 //$schema
 //"$schema": "https://json-schema.org/draft/2020-12/schema",
 export class JsonSchema$schema extends JsonSchemaBaseSchema {
-    constructor($schema: string) {
+    constructor(parent: JsonSchemaBaseSchema, $schema: string) {
         if ($schema == "")
             $schema = "https://json-schema.org/draft/2020-12/schema"
-        super("$schema", JsonSchemaDataType.String, $schema,false);
+        super(parent, "", "$schema", JsonSchemaDataType.String, $schema, false);
     }
 }
 
@@ -242,13 +399,13 @@ export class JsonSchema$schema extends JsonSchemaBaseSchema {
 //$id
 //"$id": "https://json-schema.org/draft/2020-12/schema",
 export class JsonSchema$id extends JsonSchemaBaseSchema {
-    constructor($id: string) {
+    constructor(parent: JsonSchemaBaseSchema, $id: string) {
         if ($id == "")
             $id = "https://example.org/draft/2020-12/schema"
-        super("$id", JsonSchemaDataType.String, $id,false);
+        super(parent, "$id", "$id", JsonSchemaDataType.String, $id, false);
     }
 }
-  
+
 
 
 //$vocabulary
@@ -260,27 +417,29 @@ export class JsonSchema$id extends JsonSchemaBaseSchema {
     "https://example.com/vocab/example-vocab": true
   },
 */
-export class JsonSchema$vocabulary extends JsonSchemaBaseSchema  {
-    constructor(uris: Array<boolean>) {
+export class JsonSchema$vocabulary extends JsonSchemaBaseSchema {
+    constructor(parent: JsonSchemaBaseSchema, uris: Array<boolean>) {
         const val: LooseObject = {}
         uris.forEach(uri => {
             val.uri = true
         });
-        super("$vocabulary",  JsonSchemaDataType.Array, val,false);
+        super(parent, "$vocabulary", "$vocabulary", JsonSchemaDataType.Array, val, false);
     }
 
-    toJson():JsonSchemaRes {
+    toJson(): JsonSchemaRes {
         const ret = new JsonSchemaRes()
         this.children.forEach(c => {
-            (<LooseObject> ret)[c.name] = true
+            if (c.name) {
+                (<LooseObject>ret)[c.name] = true
+            }
         });
- 
-        return ret  
+
+        return ret
     }
- 
-    public NewSubSchema(){ 
-        this.children.push( new JsonSchemaVocabularySubSchema()) 
-} 
+
+    public NewSubSchema() {
+        this.children.push(new JsonSchemaVocabularySubSchema(this))
+    }
 }
 
 
@@ -288,8 +447,8 @@ export class JsonSchema$vocabulary extends JsonSchemaBaseSchema  {
 //"$ref": "some ref",
 //                    "$ref": "#/$defs/enabledToggle",
 export class JsonSchema$ref extends JsonSchemaBaseSchema {
-    constructor($ref: string) {
-        super("$ref", JsonSchemaDataType.String,  $ref,false);
+    constructor(parent: JsonSchemaBaseSchema, $ref: string) {
+        super(parent, "$ref", "$ref", JsonSchemaDataType.String, $ref, false);
     }
 }
 
@@ -297,8 +456,8 @@ export class JsonSchema$ref extends JsonSchemaBaseSchema {
 //"$dynamicRef": "some dynamicRef",
 //"$dynamicRef": "#node"
 export class JsonSchema$dynamicRef extends JsonSchemaBaseSchema {
-    constructor($dynamicRef: string) {
-        super("$ref",  JsonSchemaDataType.String, $dynamicRef,false);
+    constructor(parent: JsonSchemaBaseSchema, $dynamicRef: string) {
+        super(parent, "$ref", "$ref", JsonSchemaDataType.String, $dynamicRef, false);
     }
 }
 
@@ -322,31 +481,50 @@ export class JsonSchema$dynamicRef extends JsonSchemaBaseSchema {
 //     }
 // }
 export class JsonSchema$defs extends JsonSchemaBaseSchema {
-    constructor() {
-        super("$defs",  JsonSchemaDataType.Object, {},false);
+    constructor(parent: JsonSchemaBaseSchema) {
+        super(parent, "$defs", "$defs", JsonSchemaDataType.Array, {}, false);
     }
 
-    AddDef(defname: string, def: JsonSchema$def): void {
-        Object.assign(this, { defname: def })
-        //this.defname = def
+    public NewSubSchema() {
+        const key = "refKey"
+        this.AddSubSchema(key)
+    }
+    public AddSubSchema(key: string): void {
+        this.children.push(new JsonSchema$def(this, key, "defName", ""))
     }
 }
 
 export class JsonSchema$def extends JsonSchemaBaseSchema {
-    constructor(name: string, val: any) {
-        super(name,  JsonSchemaDataType.String, val,false);
+    constructor(parent: JsonSchemaBaseSchema, id: string, name: string, val: any) {
+        super(parent, id, name, JsonSchemaDataType.String, val, true);
     }
 }
- 
 
+//JsonSchemaProperties "properties"
 export class JsonSchemaProperties extends JsonSchemaBaseSchema {
-    constructor() {
-        super("properties",  JsonSchemaDataType.Object, new JsonSchemaDefault(),false);
+    constructor(parent: JsonSchemaBaseSchema) {
+        super(parent, "properties", "properties", JsonSchemaDataType.Object, new JsonSchemaObject(parent, "uname"), false);
+    }
+
+    public NewSubSchema() {
+        const key = "propertyKey"
+        this.AddSubSchema(key)
+    }
+    public AddSubSchema(key: string): void {
+        //this.children.push(new JsonSchemaProperty(this,key)) 
+        // const a = 
+        this.children.push(new JsonSchemaProperty(this, key))
     }
 }
 
 
- 
+//JsonSchemaPropertiy, sub schema of  "properties"
+export class JsonSchemaProperty extends JsonSchemaBaseSchema {
+    constructor(parent: JsonSchemaBaseSchema, key: string) {
+        super(parent, key, "property name", JsonSchemaDataType.Object, new JsonSchemaObject(parent, "uname"), true);
+    }
+}
+
 /*
 /////////////////////
 

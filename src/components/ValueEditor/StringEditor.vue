@@ -50,21 +50,23 @@ const EditorProps = Vue.extend({
 @Component
 export default class StringEditor extends EditorProps {  
    
-  data(){
-    return {
-      editValue: this.value 
+  // data(){
+  //   return {
+  //     editValue: this.value 
       
-    }
-  }
+  //   }
+  // }
+  editValue = this.value 
 
   onValueChange(val : string){
     this.$emit('input', val)
+    this.$emit('change', this.refPropertyId, val)
   }
     
-  // @Watch('editValue', { immediate: true, deep: true })
-  // onChanged1(val: string, oldVal: string) {
-  //   this.$emit("change",this.refPropertyId, val,oldVal)
-  // }
+  @Watch('value', { immediate: true, deep: true })
+  onChanged1(val: string, oldVal: string) {
+    this.editValue = val
+  }
  
 }
  

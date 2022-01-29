@@ -41,6 +41,12 @@ export default class ObjectEditor extends EditorProps {
       editValue: this.value  
     }
   }
+  
+  onValueChange(val : string){
+    this.$emit('input', val)
+    this.$emit('change', this.refPropertyId, val)
+  }
+    
     
 }
 </script>
